@@ -1,0 +1,21 @@
+# C++
+build/
+bin/
+lib/
+*.o
+*.a
+*.so
+*.out
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# OS/IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
