@@ -1,85 +1,126 @@
-# Sentinel-HealOps: Project Learning Guide
+# Sentinel-HealOps: Exhaustive Code Explanation Guide
 
-Welcome to the **HealOps** learning guide. This document provides a deep dive into the architecture, code, and concepts behind the autonomous SRE system for high-frequency trading.
-
----
-
-## 1. Core Concepts
-
-### 1.1 Limit Order Book (LOB)
-The heart of any exchange is the **Order Book**. It maintains a list of buy (bids) and sell (asks) orders.
-- **Price-Time Priority**: Orders are matched first based on the best price. If prices are equal, the order that arrived first (time) is prioritized.
-- **Data Structures**: Efficient LOBs use `std::map` or `std::set` (Red-Black Trees) for price indexing and `std::deque` or linked lists for time-priority queues at each price level.
-
-### 1.2 Telemetry Ingestion: The "Observer Effect"
-In high-frequency systems, monitoring must be as lightweight as possible. 
-- **io_uring**: A Linux-native asynchronous I/O interface that minimizes context switches. It allows us to "harvest" logs directly from the kernel space without stalling the main engine threads.
-- **Lock-Free Buffers**: Passing data between the engine and the sidecar using ring buffers ensures the "Matching Path" is never blocked by "Logging Path".
-
-### 1.3 Statistical Anomaly Detection (Z-Score)
-Before using heavy AI models, we use simple math to filter the noise.
-- **Z-Score Formula**: $Z = \frac{x - \mu}{\sigma}$
-- **Dynamic Thresholding**: We calculate a rolling mean ($\mu$) and standard deviation ($\sigma$) of trade latencies. If a new trade's latency ($x$) has a Z-score $> 3$, it's an outlier (anomaly).
+This document is for developers who want to understand exactly how every line of code in the **Sentinel-HealOps** project works.
 
 ---
 
-## 2. Code Walkthrough
+## 1. Engine Component (`engine/`)
 
-### 2.1 The Engine (`/engine`)
-- **`Order.h`**: Defines the `Order` and `Trade` structures. We use `timestamp_ns` (nanoseconds) to measure sub-millisecond performance.
-- **`OrderBook.cpp`**: Implements the matching logic. 
-    - `matchBuy()`: Iterates through the `asks_` map (lowest price first).
-    - `matchSell()`: Iterates through the `bids_` map (highest price first).
-- **`Logger.cpp`**: A thread-safe CSV writer. In a production system, this would be replaced by a memory-mapped file or a ring buffer.
+### 1.1 `engine/include/Order.h`
+This header defines the data models for orders and trades.
 
-### 2.2 The Interceptor (`/interceptor`)
-- **`ZScoreDetector.cpp`**: Uses **Welford’s Algorithm** for "online" calculation of mean and variance. This is mathematically more stable than traditional methods when dealing with thousands of samples per second.
-- **`main.cpp`**: Acts as a "tail -f" for the trade log. It feeds every line into the detector and triggers an HTTP POST if an anomaly is found.
-
-### 2.3 The Brain (`/brain`)
-- **FastAPI**: A high-performance Python framework.
-- **Random Forest**: Why RF? It's fast at inference time and handles non-linear relationships well (e.g., "CPU spike + Memory leak" = `CRITICAL_FAILURE`).
-
----
-
-## 3. Workflow Summary
-
-1. **Order Input**: User sends a BUY/SELL limit order.
-2. **Matching**: Engine matches it against the book.
-3. **Trace**: Match details (latency) are logged to `/tmp/healops_trades.csv`.
-4. **Ingestion**: Interceptor sidecar reads the CSV in real-time.
-5. **Detection**: Interceptor calculates Z-score. If $Z > 3$, it flags an anomaly.
-6. **Classification**: Brain (Python) receives the flag and classifies it (e.g., "Network Degradation").
-7. **Remediation**: Governor triggers a GitHub Actions rollback to a stable container image.
-
----
-
-## 4. How to Build & Learn
-
-### Prerequisites
-- Linux (Ubuntu/Mint)
-- C++20 Compiler (GCC/Clang)
-- CMake 3.20+
-- Python 3.11+
-
-### Build Steps
-```bash
-# 1. Compile the C++ components
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-
-# 2. Run the Engine
-./engine/matching_engine
-
-# 3. Run the Interceptor (in a new tab)
-./interceptor/interceptor
+```cpp
+enum class Side : uint8_t { BUY, SELL };
 ```
+- **Why `enum class`?**: It provides strong typing. You can't accidentally compare a `Side` to an integer.
+- **Why `uint8_t`?**: In memory-constrained systems, using 1 byte instead of 4 (the default `int`) saves space when storing millions of orders.
+
+```cpp
+struct Order {
+    uint64_t    id;
+    double      price;
+    uint64_t    qty;
+    Side        side;
+    OrderType   type;
+    int64_t     timestamp_ns; 
+```
+- **`timestamp_ns`**: We use nanoseconds to measure the difference between order arrival and matching. In high-frequency trading, even 1 millisecond (1,000,000 ns) is considered slow.
 
 ---
 
-## 5. Regular Updates
-This document will be updated as we implement **Phase 2 (AI Training)** and **Phase 3 (Auto-Remediation)**.
+### 1.2 `engine/src/OrderBook.cpp` (The Matching Engine)
+This is the most critical file in the project.
 
-> [!TIP]
-> Focus on the `latency_ns` logic in `OrderBook.cpp` — it is the primary metric that HealOps monitors.
+#### **The Price-Time Priority Logic**
+```cpp
+std::map<double, PriceLevel, std::greater<double>> bids_;
+std::map<double, PriceLevel>                       asks_;
+```
+- **Bids**: Uses `std::greater<double>` because the exchange must always match the **highest bid** first.
+- **Asks**: Uses the default (lowest price first) because the exchange matches the **lowest ask** first.
+- **Performance**: `std::map` is a Red-Black Tree. Searching for a price is $O(\log N)$. For millions of levels, we might use a hash map or a flat array, but for an MVP, `std::map` provides the best balance of speed and simplicity.
+
+#### **The Matching Loop (`matchBuy`)**
+```cpp
+while (order.qty > 0 && !asks_.empty()) {
+    auto& [ask_price, level] = *asks_.begin();
+    if (order.price < ask_price) break; // Price doesn't cross
+```
+- **`*asks_.begin()`**: We always look at the cheapest available sell order.
+- **The "If"**: If our buy price is lower than the cheapest sell price, no match is possible. The order must stay in the book as a "limit" order.
+
+---
+
+### 1.3 `engine/src/Logger.cpp`
+This records every matching event.
+
+```cpp
+void TradeLogger::log(const Trade& t) {
+    std::lock_guard lk(mtx_);
+    file_ << t.matched_at_ns << ',' << t.latency_ns << ...
+}
+```
+- **`std::lock_guard`**: This is critical. Multiple matches might happen---
+
+## 2. Project Directory & File Breakdown
+
+### **`engine/`** (The Trading Core)
+This directory contains the high-performance C++ matching engine.
+- **`include/Order.h`**: The "Atom" of the system. Defines what an `Order` and a `Trade` look like. 
+    - *If/But*: Uses `int64_t` for nanosecond timestamps to avoid overflow for the next ~290 years.
+- **`include/OrderBook.h`**: The "Blueprint". Defines the `PriceLevel` (as a `std::deque`) and the `OrderBook` class.
+- **`src/OrderBook.cpp`**: The "Brain". This contains the matching loop. 
+    - [**DEEP DIVE: Line-by-Line Match Engine Walkthrough**](file:///home/iiitl/Documents/Sentinel-HealOps/docs/orderbook_walkthrough.md)
+- **`src/Logger.cpp`**: The "Recorder". Writes every trade to a CSV file.
+
+### **`interceptor/`** (The SRE Sidecar)
+A low-overhead monitor that watches the engine's performance.
+- **`include/ZScoreDetector.h`**: Header for the statistical engine.
+- **`src/ZScoreDetector.cpp`**: The "Math". Implements Welford's Algorithm for rolling statistics.
+    - [**DEEP DIVE: Line-by-Line Math & Detector Walkthrough**](file:///home/iiitl/Documents/Sentinel-HealOps/docs/detector_walkthrough.md)
+- **`src/main.cpp`**: The "Tailer". Continuously reads the trade log and sends anomalies to the Brain via raw HTTP.
+
+### **`scripts/`** (Testing & Automation)
+- **`load_generator.py`**: Simulates thousands of orders per second and injects "faults" (artificial delay) so we can see the system heal.
+
+---
+
+## 3. Detailed Line-by-Line Code Walkthroughs
+
+Because this project uses advanced C++ (C++20) and real-time statistics, we've created dedicated deep-dive documents:
+
+1. **[Core Matching Logic (engine/src/OrderBook.cpp)](file:///home/iiitl/Documents/Sentinel-HealOps/docs/orderbook_walkthrough.md)**
+   - Explains how Bid/Ask maps work.
+   - Breakdown of the Price-Time priority loop.
+   - Memory management and performance trade-offs.
+
+2. **[Anomaly Detection Math (interceptor/src/ZScoreDetector.cpp)](file:///home/iiitl/Documents/Sentinel-HealOps/docs/detector_walkthrough.md)**
+   - Explains Welford's Algorithm for online mean/variance.
+   - Why simple averages fail in high-frequency monitoring.
+   - The significance of the Z-Score threshold (3.0 sigma).
+
+---
+
+## 4. Operational Workflow
+
+1. **Trade Match**: `OrderBook.cpp` finds a price-time match.
+2. **Log Entry**: `Logger.cpp` writes `latency_ns` to a file.
+3. **Observation**: `interceptor/main.cpp` reads the new line.
+4. **Analysis**: `ZScoreDetector.cpp` flags the latency as "normal" or "outlier".
+5. **Report**: An outlier triggers a raw HTTP POST to the Brain.
+ts a "fail" flag. We must clear this flag so the next time the engine writes a line, we can read it.
+- **Why not `inotify`?**: `inotify` is better but more complex. Tailing with a 10ms sleep is sufficient for an MVP and works on almost any version of Linux.
+
+---
+
+## 3. Communication Logic (The "Ifs" and "Buts")
+
+### **Why use raw sockets for HTTP?**
+In `interceptor/src/main.cpp`, we use `socket()`, `connect()`, and `send()`.
+- **Pros**: Zero external libraries (no `libcurl`). Very fast.
+- **Cons**: It doesn't support HTTPS (SSL/TLS). 
+- **The Decision**: Since the interceptor and brain are usually on the same local network (or the same machine), raw HTTP is fine. If we move this to production, we would add MbedTLS or OpenSSL.
+
+---
+
+*This guide will be expanded line-by-line for Phase 2 (Python ML code).*
