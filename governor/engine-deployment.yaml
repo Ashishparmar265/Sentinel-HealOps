@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healops-engine
+  labels:
+    app: healops-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healops-engine
+  template:
+    metadata:
+      labels:
+        app: healops-engine
+    spec:
+      containers:
+      - name: matching-engine
+        image: sentinel-healops/engine:latest
+        imagePullPolicy: IfNotPresent
+        # The engine normally listens to FIX connections or takes local input
+        ports:
+        - containerPort: 9000
+        # Simulated resources for the MVP
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"

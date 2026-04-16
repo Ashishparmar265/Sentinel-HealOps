@@ -1,0 +1,153 @@
+This comprehensive project document outlines the complete technical blueprint for
+Sentinel-HealOps. It is designed to demonstrate high-level engineering across the entire
+stack, from low-level C++ ingestion to cloud-native orchestration and AI-driven remediation.
+
+PROJECT DESIGN DOCUMENT
+Project Title: Sentinel-HealOps: An Autonomous Self-Healing Infrastructure for Multi-Agent AI
+Systems
+Author: Ashish Parmar
+Specialization: AI & Machine Learning (M.Tech, IIIT Lucknow)
+Target Goal: Production-grade SRE for Agentic Frameworks.
+
+1. System Architecture Overview
+The system follows a Separation of Concerns model where the "Data Plane" handles
+high-speed telemetry and the "Control Plane" manages AI-driven decision-making.
+
+2. Backend & Infrastructure Specification
+Category
+
+Technology
+
+Implementation Detail
+
+Source Control
+
+Git (GitHub)
+
+Uses a GitOps workflow where
+all infrastructure and agent
+configurations are versioned.
+Protected branches and
+commit-signing are required.
+
+Backend Framework
+
+Data Plane: C++20
+
+The data plane uses io_uring
+for non-blocking log ingestion.
+The control plane serves the AI
+models via asynchronous
+Python.
+
+Control Plane: FastAPI
+
+API Design
+
+REST & gRPC
+
+REST for external dashboard
+communication; gRPC for
+low-latency internal
+communication between the
+ingestor and the brain.
+
+Database
+
+PostgreSQL + pgvector
+
+Stores long-term logs and
+"Agent Memory" embeddings
+for root-cause analysis.
+
+Caching
+
+Redis
+
+Used for real-time "Trust
+Scores" and frequently
+accessed agent state
+snapshots to reduce DB load.
+
+Message Queues
+
+RabbitMQ / Kafka
+
+Facilitates asynchronous
+tasking between SentinelARC
+agents and the HealOps event
+bus.
+
+Containerization
+
+Multi-stage Docker
+
+Uses "Distroless" images for
+the final production build to
+minimize the security attack
+surface.
+
+Orchestration
+
+Kubernetes (AKS)
+
+Managed via Helm Charts.
+Deployed on Azure Kubernetes
+Service (AKS) using the
+"Automatic" tier.
+
+Cloud Deployment
+
+Microsoft Azure
+
+Infrastructure is provisioned
+using Terraform (IaC).
+
+3. CI/CD & DevSecOps Pipeline
+The pipeline is designed for Canary Deployments with automated safety gates.
+●​ Security: Gitleaks scans for secrets; Trivy scans Docker images for vulnerabilities.​
+●​ Automation: GitHub Actions triggers a deployment to a 5% canary group.​
+●​ The "Heal" Trigger: If the HealOps brain detects a $Z$-score anomaly in the canary, it
+sends a webhook to GitHub to execute a helm rollback instantly.​
+
+4. Authentication and Security
+●​ Identity: Uses OIDC (OpenID Connect) for passwordless authentication between
+GitHub Actions and Azure (Workload Identity Federation).​
+●​ Secrets: All API keys for LLMs and databases are stored in Azure Key Vault and injected
+at runtime.​
+●​ Security Policy: Implements Zero-Trust networking where agents only communicate
+over encrypted mTLS tunnels.
+
+5. Frontend: The Sentinel Dashboard
+The frontend is a React-based "Command Center" built with Tailwind CSS.
+●​ Real-time Monitoring: WebSockets stream the AI's "Thought Process" and system health
+metrics.
+●​ Trace Viewer: A visual map showing every tool call (MCP) and agent-to-agent message
+(ACP).
+●​ Chaos Panel: A testing suite to manually inject faults (e.g., killing a tool server) to verify
+self-healing.
+
+6. Integration: Merging with SentinelARC
+To merge HealOps with your existing SentinelARC project, follow this three-step integration
+plan:
+
+1.​ Instrumentation (The Sidecar):​
+Modify your SentinelARC deployment to include the HealOps C++ Ingestor as a Sidecar
+container in every agent pod. This allows the ingestor to read the agent's logs directly
+from /dev/stdout.
+2.​ Protocol Alignment:​
+Update the Agent Communication Protocol (ACP) to include a "Metadata Header" in
+every message. This header contains a trace_id that HealOps uses to track a request as it
+moves from the Orchestrator to the Search Agent.
+3.​ The Remediation Loop:​
+Configure SentinelARC's Orchestrator to accept "Recovery Signals" from HealOps. For
+example, if HealOps detects the MCP Fetch Server is down, it sends a signal to the
+Orchestrator to switch that specific agent to a "Cached Data" mode.
+
+7. Summary of Market Value
+By building this, you demonstrate to recruiters that you can architect a system that is
+Performant (C++), Intelligent (ML/LLM), Scalable (K8s/Kafka), and Secure (OIDC/Vault).
+Would you like me to generate the specific Terraform code to provision the Azure
+Kubernetes Service (AKS) and the Redis cache for this project?
+
+

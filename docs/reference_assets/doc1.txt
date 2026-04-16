@@ -1,0 +1,183 @@
+PROJECT DESIGN DOCUMENT
+Project Title: HealOps: Autonomous SRE and Self-Healing Infrastructure for a High-Frequency
+C++ Order Matching Engine
+Author: Ashish Parmar
+Institution: Indian Institute of Information Technology, Lucknow (IIITL)
+Department: Computer Science & Engineering (M.Tech)
+Specialization: Artificial Intelligence & Machine Learning
+Date: March 2026
+
+1. Abstract
+In ultra-low latency environments such as financial trading exchanges, system reliability is as
+critical as execution speed. Traditional observability platforms rely on human-in-the-loop
+debugging, which is insufficient when a degradation of even 50 milliseconds constitutes a
+catastrophic failure. This project proposes a fully autonomous Site Reliability Engineering (SRE)
+layer, termed "HealOps," integrated with a custom-built, high-frequency C++ Order Matching
+Engine. By utilizing non-blocking I/O for telemetry ingestion and a Hybrid AI Classifier (Random
+Forest paired with an LLM fallback), HealOps intercepts system logs, identifies latency
+anomalies in real-time, and triggers automated failovers via CI/CD webhooks. Designed for
+deployment on resource-constrained hardware such as an HP ProBook Ryzen 5, the system
+demonstrates true zero-touch remediation in high-throughput data processing systems.
+
+2. Introduction
+2.1 Background
+Financial technology relies on Order Matching Engines to pair buy and sell requests at millions
+of transactions per second. These systems are highly optimized, utilizing advanced C++
+memory management and parallel processing. However, when deployed in containerized cloud
+environments, they become susceptible to network latency spikes, "noisy neighbor" resource
+exhaustion, and complex microservice cascading failures.
+2.2 Problem Statement
+When a network switch degrades or an incoming data stream causes serialization errors, an
+order engine may not crash immediately; instead, it experiences latency bloat. Standard
+CPU/RAM dashboards often fail to trigger alerts for these micro-anomalies. Consequently,
+trades are executed out of optimal windows before engineers can manually identify the
+
+bottleneck and reroute traffic.
+2.3 Objectives
+The primary objectives of this project are:
+1.​ Engine Development: To engineer a Level 3 (L3) order matching engine in C++ capable of
+sub-millisecond trade execution.
+2.​ Telemetry Interception: To implement a zero-overhead log and metric ingestion sidecar
+that does not impact the critical path of the matching engine.
+3.​ Algorithmic Triage: To deploy an AI-driven control plane that calculates statistical
+deviations in latency and categorizes anomalies without human intervention.
+4.​ Autonomous Failover: To establish direct webhook communication with infrastructure
+pipelines to automatically reroute traffic or execute rollbacks when a fault is detected.
+
+3. Theoretical Framework
+3.1 High-Frequency Order Matching
+The core application utilizes an in-memory Limit Order Book (LOB) built with cache-friendly
+data structures (e.g., Red-Black Trees or lock-free queues). It achieves concurrency by pinning
+threads to specific CPU cores, ensuring that memory access bypasses slower L3 caches
+whenever possible.
+3.2 The HealOps Anomaly Pipeline
+To detect network or logic degradation, HealOps employs a mathematical and
+machine-learning hybrid approach:
+●​ Statistical Triage: The C++ ingestor tracks processing times and calculates a rolling
+Z-score for latency:​
+$$Z = \frac{x - \mu}{\sigma}$$​
+If the latency $x$ deviates significantly from the historical mean $\mu$, the telemetry is
+flagged.
+●​ Classification: A Scikit-learn Random Forest model categorizes the flagged anomaly (e.g.,
+"TCP Timeout," "Memory Leak").
+●​ Deep Reasoning: For uncategorized architectural failures, the system passes the stack
+trace to an LLM to extract the root cause and determine the safest remediation strategy.
+
+4. System Architecture
+The architecture is divided into the Target Application and the HealOps Immune System:
+4.1 The Target: C++ Matching Engine
+●​ Language: C++20.
+●​ Role: Processes simulated FIX (Financial Information eXchange) protocol messages.
+
+●​ Logic: Maintains the order book and logs execution times for every matched trade.
+4.2 The Interceptor: High-Speed Ingestor
+●​ Language: C++ / Linux socket programming.
+●​ Role: Acts as a DaemonSet to harvest logs.
+●​ Logic: Uses io_uring to read logs directly from the Linux kernel space, discarding normal
+traffic and forwarding only statistical outliers to the AI brain.
+4.3 The Brain: Hybrid AI Classifier
+●​ Language: Python (FastAPI).
+●​ Role: The anomaly detection and decision engine.
+●​ Logic: Processes LOB latency metrics, identifies the fault domain, and generates the
+remediation payload.
+4.4 The Governor: Automated CI/CD Remediation
+●​ Tooling: GitHub Actions, Docker.
+●​ Role: Executes the physical recovery.
+●​ Logic: Listens for HTTP POST webhooks from the Brain to instantly redeploy a stable
+container image or route traffic to a secondary cluster instance.
+
+5. Implementation Strategy
+5.1 Technology Stack
+●​
+●​
+●​
+●​
+
+Host OS: Linux Mint / Ubuntu (optimized for Docker and kernel-level networking).
+Data Plane: C++20, Boost.Asio.
+Control Plane: Python 3.11, Scikit-learn.
+Infrastructure: Docker, Docker Compose, GitHub Actions.
+
+5.2 Phase 1: Engine and baseline metrics
+●​ Goal: Build a functional order book and establish baseline latency ($<1$ms).
+●​ Method: Implement the matching logic and write a load-generator script to simulate
+10,000 trades per second.
+5.3 Phase 2: HealOps Integration
+●​ Goal: Attach the SRE sidecar and train the Level 1 ML classifier.
+●​ Method: Set up the Python backend to receive telemetry. Train the Random Forest model
+using synthetic data representing healthy traffic and known failure states.
+5.4 Phase 3: Chaos Engineering and Verification
+●​ Goal: Prove the self-healing capabilities.
+●​ Method: Utilize fault-injection (e.g., tc command in Linux to simulate network packet loss).
+Observe the engine degrade, watch HealOps detect the $Z$-score spike, and verify the
+
+automated CI/CD failover recovery.
+
+6. Challenges & Risk Mitigation
+Challenge
+
+Impact
+
+Mitigation Strategy
+
+Observer Effect Latency
+
+The monitoring tool slows
+down the trading engine,
+defeating the purpose.
+
+Use memory-mapped files
+(mmap) or lock-free ring
+buffers for the C++ sidecar to
+read telemetry without locking
+the main thread.
+
+False Positive Failovers
+
+Triggering a node restart
+during a normal traffic spike
+disrupts trading.
+
+Implement a strict confidence
+threshold for the AI model and
+require the anomaly to persist
+for $N$ consecutive
+milliseconds before acting.
+
+State Corruption
+
+A hard restart of the
+matching engine deletes
+unmatched orders in RAM.
+
+Implement deterministic
+event-sourcing; the system
+must rebuild its state from a
+persistent data lake before
+accepting new traffic
+post-recovery.
+
+7. Expected Outcomes & Performance Metrics
+●​ Engine Throughput: Processing $>50,000$ transactions per second on local hardware.
+●​ Ingestion Overhead: Telemetry interception adding $<0.1$ms to the critical path.
+●​ Mean Time To Recovery (MTTR): Reduction of system recovery time from
+human-dependent minutes to autonomous sub-second failovers during injected chaos
+events.
+
+8. Future Scope
+Future iterations will explore migrating the log interception layer from user-space to
+kernel-space using eBPF (Extended Berkeley Packet Filter). Furthermore, the Order Matching
+
+Engine can be scaled into a distributed system utilizing the Raft consensus algorithm, allowing
+HealOps to manage an entire cluster of trading nodes.
+
+9. Conclusion
+This project demonstrates the critical intersection of high-performance computing and
+modern SRE practices. By building a highly optimized C++ matching engine and intentionally
+breaking it, the development of HealOps proves that AI-driven observability can successfully
+execute automated, safe remediation in the most latency-sensitive environments.
+
+Would you like to start by designing the C++ data structures for the Limit Order Book, or should
+we map out the exact GitHub Actions workflow for the failover mechanism first?
+
+

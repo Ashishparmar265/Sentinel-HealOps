@@ -60,7 +60,9 @@ void TradeLogger::log(const Trade& t) {
     file_ << t.matched_at_ns << ',' << t.latency_ns << ...
 }
 ```
-- **`std::lock_guard`**: This is critical. Multiple matches might happen---
+- **`std::lock_guard`**: This is critical. Multiple matches might happen concurrently across different order books or threads. Without locking, they would write over each other and corrupt our CSV data.
+
+---
 
 ## 2. Project Directory & File Breakdown
 
@@ -73,15 +75,20 @@ This directory contains the high-performance C++ matching engine.
     - [**DEEP DIVE: Line-by-Line Match Engine Walkthrough**](file:///home/iiitl/Documents/Sentinel-HealOps/docs/orderbook_walkthrough.md)
 - **`src/Logger.cpp`**: The "Recorder". Writes every trade to a CSV file.
 
-### **`interceptor/`** (The SRE Sidecar)
-A low-overhead monitor that watches the engine's performance.
-- **`include/ZScoreDetector.h`**: Header for the statistical engine.
-- **`src/ZScoreDetector.cpp`**: The "Math". Implements Welford's Algorithm for rolling statistics.
-    - [**DEEP DIVE: Line-by-Line Math & Detector Walkthrough**](file:///home/iiitl/Documents/Sentinel-HealOps/docs/detector_walkthrough.md)
-- **`src/main.cpp`**: The "Tailer". Continuously reads the trade log and sends anomalies to the Brain via raw HTTP.
+### **`brain/`** (The AI Control Plane)
+A high-performance Python service that classifies anomalies.
+- **`main.py`**: FastAPI app with the `/ingest` endpoint. Processes traces in real-time.
+- **`model.py`**: Training script for the Random Forest model. Generates synthetic data and saves the `.pkl` artifact.
+    - [**DEEP DIVE: Line-by-Line Brain & ML Walkthrough**](file:///home/iiitl/Documents/Sentinel-HealOps/docs/brain_walkthrough.md)
+
+### **`governor/`** (The Remediation Layer)
+Reacts to the Brain's decisions by executing infrastructure changes.
+- **`action-webhook.py`**: A FastAPI webhook simulator that converts JSON payload actions into Kubernetes shell commands.
+- **`engine-deployment.yaml`**: The Kubernetes Deployment manifest for the matching engine used during rollouts.
 
 ### **`scripts/`** (Testing & Automation)
 - **`load_generator.py`**: Simulates thousands of orders per second and injects "faults" (artificial delay) so we can see the system heal.
+- **`test_remediation_layer.sh`**: The end-to-end Python/Mock verification shell script.
 
 ---
 
@@ -99,6 +106,12 @@ Because this project uses advanced C++ (C++20) and real-time statistics, we've c
    - Why simple averages fail in high-frequency monitoring.
    - The significance of the Z-Score threshold (3.0 sigma).
 
+3. **[Brain Control Plane (brain/main.py)](file:///home/iiitl/Documents/Sentinel-HealOps/docs/brain_walkthrough.md)**
+   - Explains the Random Forest generation and FastAPI integration.
+
+4. **[Governor Webhook (governor/action-webhook.py)](file:///home/iiitl/Documents/Sentinel-HealOps/docs/governor_walkthrough.md)**
+   - Explains the self-healing Kubernetes wrapper logic that automates `kubectl rollout`.
+
 ---
 
 ## 4. Operational Workflow
@@ -108,7 +121,13 @@ Because this project uses advanced C++ (C++20) and real-time statistics, we've c
 3. **Observation**: `interceptor/main.cpp` reads the new line.
 4. **Analysis**: `ZScoreDetector.cpp` flags the latency as "normal" or "outlier".
 5. **Report**: An outlier triggers a raw HTTP POST to the Brain.
-ts a "fail" flag. We must clear this flag so the next time the engine writes a line, we can read it.
+
+---
+
+## 5. File Tailing Logic (`interceptor/src/main.cpp`)
+
+The engine writes to a file, and the interceptor reads from it like `tail -f`.
+- **Why `std::ifstream::clear()`?**: When a file hits `EOF` (End of File), C++ sets a "fail" flag. We must clear this flag so the next time the engine writes a line, we can read it.
 - **Why not `inotify`?**: `inotify` is better but more complex. Tailing with a 10ms sleep is sufficient for an MVP and works on almost any version of Linux.
 
 ---

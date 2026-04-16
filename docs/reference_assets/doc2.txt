@@ -1,0 +1,182 @@
+PROJECT DESIGN DOCUMENT
+Project Title: Sentinel-HealOps: A Self-Healing Distributed Log Analytics and Autonomous
+Infrastructure Engine for Multi-Agent Systems Author: Ashish Parmar Institution: Indian Institute
+of Information Technology, Lucknow (IIITL) Department: Computer Science & Engineering
+(M.Tech) Specialization: Artificial Intelligence & Machine Learning Date: March 2026
+
+1. Abstract
+Modern microservice architectures and multi-agent AI systems face a critical observability
+bottleneck: while traditional dashboards highlight system failures, they do not provide
+automated root-cause analysis or remediation. In the context of the SentinelARC multi-agent
+system, where asynchronous agent communication (ACP) and tool access (MCP) create
+complex failure matrices, manual debugging leads to severe downtime. This project,
+Sentinel-HealOps, proposes a self-healing backend infrastructure. By utilizing a
+high-throughput C++ ingestion engine combined with a Hybrid AI Classifier (Random Forest
+and LLM), the system intercepts log streams, identifies anomalies in real-time, and
+communicates directly with CI/CD pipelines to trigger autonomous rollbacks or pod scaling,
+achieving zero-touch remediation.
+
+2. Introduction
+2.1 Background
+The paradigm of IT Operations is shifting from passive monitoring to AIOps (Artificial
+Intelligence for IT Operations). While existing tools aggregate logs, finding the exact cause of a
+crash in a distributed system remains a "needle-in-a-haystack" problem. The industry standard
+requires systems that not only observe but act—a concept known as Observability-to-Action.
+2.2 Problem Statement
+Running a persistent swarm of AI agents requires high reliability. If a Search Agent fails a tool
+call or a proxy timeout occurs, the entire workflow collapses. Traditional JSON log analysis is
+too slow for real-time agent recovery. Furthermore, when bad code is deployed, engineers lose
+critical hours manually identifying the faulty service and executing rollbacks via Kubernetes or
+Terraform.
+2.3 Objectives
+The primary objectives of the Sentinel-HealOps engine are:
+1.​ High-Speed Ingestion: To build a C++ data plane capable of processing millions of log
+events with sub-millisecond latency.
+
+2.​ Hybrid Anomaly Detection: To implement a two-tiered AI brain utilizing a lightweight ML
+model for speed and an LLM for complex logic reasoning.
+3.​ Autonomous Remediation: To establish a direct webhook integration with GitHub
+Actions for immediate, automated rollbacks during Canary Deployment failures.
+4.​ Agentic Reliability: To provide a self-healing layer specifically designed for the brittle
+nature of multi-agent tool calls (MCP) and communication buses.
+
+3. Theoretical Framework
+3.1 Hybrid Classification Pipeline
+Relying solely on LLMs for log analysis introduces unacceptable latency and cost.
+Sentinel-HealOps utilizes a hybrid mathematical and ML approach:
+●​ Statistical Triage: The C++ engine calculates a rolling Z-score for error frequency: $Z =
+\frac{x - \mu}{\sigma}$. If the threshold is breached, the data is forwarded.
+●​ Fast Classification: A scikit-learn Random Forest model categorizes known error patterns
+(e.g., OOMKilled, Network Timeout).
+●​ Deep Reasoning: Only novel or complex logic errors are passed to the SentinelARC
+Orchestrator for root-cause extraction.
+3.2 GitOps and Canary Deployments
+The system adheres to modern GitOps principles, where the Git repository is the single source
+of truth for infrastructure. By deploying changes to only 5% of the user base (a Canary release),
+the HealOps engine can evaluate system stability. If the anomaly classifier detects a regression,
+the system bypasses human intervention and reverts the cluster state to the previous stable
+commit.
+
+4. System Architecture
+The system is composed of three primary modules:
+4.1 The Data Plane (The Ingestor)
+●​ Language: C++ (for minimal memory footprint and maximum throughput).
+●​ Role: Acts as the high-speed log harvester deployed as a DaemonSet on Kubernetes
+nodes.
+●​ Logic: Uses non-blocking I/O (io_uring) to read system streams, performs regex-based
+noise reduction, and forwards critical telemetry to the Control Plane.
+4.2 The Control Plane (The Brain)
+●​ Language: Python (FastAPI).
+●​ Role: The intelligence layer hosting the Hybrid Classifier.
+●​ Logic: Receives filtered logs, processes them through the Random Forest model, and
+consults the LLM for unstructured stack traces. It maintains the system "Health Map" state.
+
+4.3 The Action Plane (The Governor)
+●​ Language: Shell/GitHub Actions via Webhooks.
+●​ Role: Executes the physical remediation.
+●​ Logic: Receives HTTP POST payloads from the Control Plane to trigger targeted kubectl
+scaling, container restarts, or full Helm rollbacks.
+
+5. Implementation Strategy
+5.1 Technology Stack
+●​
+●​
+●​
+●​
+
+Data Plane: C++20, TCP/UDP sockets.
+Control Plane: Python 3.11, FastAPI, Scikit-Learn, PostgreSQL (pgvector).
+Infrastructure: Docker, Azure Kubernetes Service (AKS), Terraform.
+CI/CD: GitHub Actions.
+
+5.2 Phase 1: High-Speed Ingestion & Noise Reduction
+●​ Goal: Build the C++ service to intercept SentinelARC logs.
+●​ Method: Implement a ring buffer architecture to prevent data loss during high-volume
+crash events, ensuring continuous telemetry flow to the Python backend.
+5.3 Phase 2: AI Model Training & Integration
+●​ Goal: Train the Level 1 ML classifier.
+●​ Method: Utilize Chaos Engineering tools (e.g., Chaos Mesh) to inject synthetic faults (CPU
+spikes, network latency) into a test cluster. Train the Random Forest on the resulting
+labeled telemetry data.
+5.4 Phase 3: The Self-Healing Loop
+●​ Goal: Connect the AI classification to physical infrastructure changes.
+●​ Method: Establish secure Webhook endpoints. Configure GitHub Actions workflows to
+listen for repository_dispatch events containing remediation instructions from the Control
+Plane.
+
+6. Challenges & Risk Mitigation
+Challenge
+
+Impact
+
+Mitigation Strategy
+
+False Positives
+
+Triggering unnecessary
+rollbacks causes disruption
+and deployment delays.
+
+Implement a strict confidence
+threshold ($>0.95$) for the
+Random Forest model before
+triggering automated GitOps
+
+actions.
+
+Ingestion Bottleneck
+
+High log volume during a
+cascading failure crashes the
+monitoring tool itself.
+
+Utilize backpressure
+mechanisms and a fixed-size
+C++ ring buffer; drop "Info"
+level logs during critical load
+spikes.
+
+Remediation Loops
+
+The system continuously
+restarts a container that is
+fundamentally broken,
+masking the issue.
+
+Implement an exponential
+backoff circuit breaker. If a
+service fails 3 times in 5
+minutes, halt auto-healing and
+escalate to a human.
+
+7. Expected Outcomes & Performance Metrics
+7.1 Throughput and Efficiency
+●​ Log Processing: Capable of sustaining >50,000 log lines per second with $<5$ms
+overhead via the C++ ingestor.
+●​ Classification Speed: Level 1 anomaly detection achieved in $<15$ms.
+7.2 Reliability Improvements
+●​ Mean Time To Recovery (MTTR): Reduction in deployment-related crash recovery from
+hours to $<45$ seconds.
+●​ Canary Safety: 100% automated termination of degraded code deployments before
+reaching the broader production environment.
+
+8. Future Scope
+This project establishes a resilient foundation for enterprise-grade autonomous systems.
+Future extensions include:
+1.​ eBPF Integration: Shifting log interception directly into the Linux kernel using eBPF for
+zero-overhead, application-agnostic network and memory tracing.
+2.​ Predictive Scaling: Upgrading the AI model from reactive anomaly detection to
+predictive forecasting (e.g., using LSTM networks) to scale resources before an
+out-of-memory error occurs.
+
+9. Conclusion
+Sentinel-HealOps demonstrates advanced engineering by uniting high-performance systems
+programming (C++) with state-of-the-art MLOps and infrastructure automation. By eliminating
+the manual debugging bottleneck, this project transforms the SentinelARC platform from an
+experimental multi-agent framework into a highly available, self-correcting enterprise
+application, representing the next evolution in cloud-native reliability.
+
+Would you like me to draft the C++ io_uring code for the high-speed log ingestion layer, or the
+deploy.yml GitHub Actions file that handles the automated rollback logic?
+
+
