@@ -10,6 +10,8 @@
 #include <signal.h>
 #include <cstring>
 #include <netinet/in.h>
+#include <liburing.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -87,30 +89,63 @@ int main(int argc, char* argv[]) {
 
     ZScoreDetector detector(window, z_thresh, on_anomaly);
 
-    std::ifstream file(log_path);
-    if (!file.is_open()) {
-        // Wait for the file to appear (engine may not have started yet)
-        std::cout << "[Interceptor] Waiting for log file: " << log_path << '\n';
-        while (!file.is_open() && g_running) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            file.open(log_path);
-        }
-    }
-
     std::cout << "[Interceptor] Tailing: " << log_path << '\n';
     std::cout << "[Interceptor] Brain endpoint: " << brain_host << ':' << brain_port << '\n';
     std::cout << "[Interceptor] Z-threshold: " << z_thresh
               << "  Window: " << window << '\n';
 
-    std::string line;
-    std::getline(file, line); // skip CSV header
-
     uint64_t processed = 0;
     uint64_t anomalies = 0;
     auto last_report   = std::chrono::steady_clock::now();
 
+    struct io_uring ring;
+    io_uring_queue_init(64, &ring, 0);
+
+    int fd = open(log_path.c_str(), O_RDONLY);
+    std::cout << "[Interceptor] Waiting for log file: " << log_path << '\n';
+    while (fd < 0 && g_running) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        fd = open(log_path.c_str(), O_RDONLY);
+    }
+
+    std::string leftover;
+    char buffer[4096];
+    off_t offset = 0;
+    bool header_skipped = false;
+
     while (g_running) {
-        if (std::getline(file, line) && !line.empty()) {
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+        io_uring_prep_read(sqe, fd, buffer, sizeof(buffer), offset);
+        io_uring_submit(&ring);
+
+        struct io_uring_cqe *cqe;
+        io_uring_wait_cqe(&ring, &cqe);
+        int res = cqe->res;
+        io_uring_cqe_seen(&ring, cqe);
+
+        if (res < 0) {
+            std::cerr << "[Interceptor] io_uring read error\n";
+            break;
+        } else if (res == 0) {
+            // EOF, wait for more data from engine
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+        
+        offset += res;
+        leftover.append(buffer, res);
+
+        size_t pos = 0;
+        while ((pos = leftover.find('\n')) != std::string::npos) {
+            std::string line = leftover.substr(0, pos);
+            leftover.erase(0, pos + 1);
+
+            if (!header_skipped) {
+                header_skipped = true;
+                continue;
+            }
+            if (line.empty()) continue;
+
             std::istringstream ss(line);
             std::string tok;
             std::vector<std::string> cols;
@@ -136,12 +171,11 @@ int main(int argc, char* argv[]) {
                           << "  σ=" << detector.stddev() / 1e6 << "ms\n";
                 last_report = now;
             }
-        } else {
-            // EOF — wait for more data
-            file.clear();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
+    
+    io_uring_queue_exit(&ring);
+    close(fd);
 
     std::cout << "[Interceptor] Shutdown. Processed=" << processed
               << "  Anomalies=" << anomalies << '\n';

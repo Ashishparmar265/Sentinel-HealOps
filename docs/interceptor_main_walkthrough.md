@@ -33,36 +33,28 @@ static bool httpPost(const std::string& host, int port,
 
 ---
 
-## 2. File Tailing Logic (The `while` loop)
+## 2. Kernel File Tailing (`io_uring`)
 
-The Interceptor acts like `tail -f` on the engine's CSV trade trace.
+The Interceptor utilizes Linux's Native `io_uring` to perform zero-copy file monitoring on the CSV trade traces, circumventing `std::ifstream` blocking overhead.
 
 ```cpp
-    std::ifstream file(log_path);
-    if (!file.is_open()) {
-        // ... Wait for file
-        while (!file.is_open() && g_running) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // [4]
-            file.open(log_path);
-        }
-    }
+    struct io_uring ring;
+    io_uring_queue_init(64, &ring, 0); // [4]
 ```
-- **[4] Wait Loop**: Start sequences matter. If we spin up the `interceptor` before the `engine` creates `/tmp/healops_trades.csv`, the interceptor shouldn't crash. It patiently polls for the file.
+- **[4] Submission Queue Integration**: Here we initialize an asynchronous polling ring with 64 slots for continuous kernel reads. 
 
 ```cpp
     while (g_running) { // [5]
-        if (std::getline(file, line) && !line.empty()) { // [6]
-            // ... Parse and feed to Z-Score ...
-        } else {
-            file.clear(); // [7]
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // [8]
-        }
-    }
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+        io_uring_prep_read(sqe, fd, buffer, sizeof(buffer), offset); // [6]
+        io_uring_submit(&ring);
+
+        struct io_uring_cqe *cqe;
+        io_uring_wait_cqe(&ring, &cqe); // [7]
 ```
-- **[5] `g_running`**: A global atomic bool. If you send `SIGINT` (Ctrl+C), it turns false and shuts down cleanly.
-- **[6] `std::getline`**: We try to read a line. If the line exists, we parse it and feed it to the Z-score detector.
-- **[7] `file.clear()`**: When we reach the End Of File (EOF), the stream enters a `fail` state. We must `clear()` this flag so we can attempt to read again on the next loop iteration.
-- **[8] The Sleep**: If there were no trades, we sleep for 10ms to avoid pegging the CPU at 100%.
+- **[5] `g_running`**: A global atomic bool tracking SIGINT bounds.
+- **[6] Submission Queue Entry (`SQE`)**: We ask the Kernel directly to populate `buffer[4096]` asynchronously starting at the `offset`. This avoids standard userspace buffering paths.
+- **[7] Completion Queue Entry (`CQE`)**: We block shortly and poll the CQE array till the OS yields our telemetry packet. By only checking `cqe->res`, we identify whether we've reached EOF without triggering global error flags like standard loops natively do!
 
 ---
 

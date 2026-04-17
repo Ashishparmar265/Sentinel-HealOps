@@ -5,5 +5,6 @@ add_executable(interceptor
     src/ZScoreDetector.cpp
 )
 
-target_include_directories(interceptor PRIVATE include)
+target_include_directories(interceptor PRIVATE include /tmp/liburing/src/include)
 target_compile_options(interceptor PRIVATE -Wall -Wextra -O2)
+target_link_libraries(interceptor PRIVATE /tmp/liburing/src/liburing.a)
