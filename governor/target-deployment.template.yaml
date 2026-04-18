@@ -1,30 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sentinelarc-mcp
+  # Generic template — replace <service-name> with your actual service name
+  # and add an entry to governor/targets.json before applying.
+  name: <service-name>
   labels:
-    app: sentinelarc-mcp
+    app: <service-name>
     managed-by: sentinel-healops
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sentinelarc-mcp
+      app: <service-name>
   template:
     metadata:
       labels:
-        app: sentinelarc-mcp
+        app: <service-name>
     spec:
       containers:
-      - name: mcp-server
-        image: ashishparmar265/sentinelarc:latest
+      - name: service
+        image: <your-image>:<tag>
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8001
         resources:
           requests:
             cpu: "250m"
-            memory: "131Mi"       # matches SentinelARC's documented per-process cap
+            memory: "128Mi"
           limits:
             cpu: "1000m"
             memory: "512Mi"

@@ -142,31 +142,42 @@ In `interceptor/src/main.cpp`, we use `socket()`, `connect()`, and `send()`.
 
 ---
 
-## 7. SentinelARC Integration (V2 Extension)
+## 7. Generic HTTP Service Integration (V2 Extension)
 
-Sentinel-HealOps can monitor **any** latency-emitting system, not just the C++ engine.
-The `scripts/sentinelarc_adapter.py` bridges the [SentinelARC](https://github.com/Ashishparmar265/SentinelARC) multi-agent system into the same pipeline.
+Sentinel-HealOps can monitor **any** HTTP microservice, not just the C++ engine. The `scripts/http_probe_adapter.py` script acts as a language-agnostic bridge.
+
+### How to Monitor Any Service (3 Steps)
+
+**Step 1** — Add the service to `governor/targets.json`:
+```json
+{ "my-api": "my-api-deployment" }
+```
+
+**Step 2** — Apply the K8s deployment template in `governor/target-deployment.template.yaml` with your service details.
+
+**Step 3** — Run the probe adapter:
+```bash
+python3 scripts/http_probe_adapter.py \
+    --service-name my-api \
+    --host 127.0.0.1 --port 8001 \
+    --endpoints /health /metrics
+```
 
 ### Data Flow
 ```
-SentinelARC FastAPI MCP Servers (port 8001)
-         │  HTTP probe (every 500ms)
+Any HTTP Service (FastAPI, Flask, Express…)
+         │  probe every 500ms
          ▼
-  sentinelarc_adapter.py
-         │  writes → /tmp/healops_sentinel_arc.csv
+  http_probe_adapter.py → /tmp/healops_<service>.csv
          ▼
-  Interceptor (io_uring tail)
-         │  Z-score anomaly detection
+  Interceptor (io_uring tail) → Z-score anomaly
          ▼
-  Brain → TARGET_REGISTRY["sentinelarc"] → "sentinelarc-mcp"
-         │  webhook
+  Brain → TARGET_REGISTRY (loaded from targets.json)
          ▼
-  Governor → kubectl rollout restart deployment/sentinelarc-mcp
+  Governor → kubectl rollout restart deployment/<target>
 ```
 
 ### Key Design Decisions
-
-- **`source` field in Anomaly**: The Brain's `/ingest` endpoint now accepts a `source` string (`"engine"` or `"sentinelarc"`). This lets the `TARGET_REGISTRY` map each source to the correct Kubernetes deployment name.
-- **Non-invasive**: The adapter is a standalone script. No changes needed inside the SentinelARC codebase.
-- **Same Z-score math**: The adapter converts HTTP probe latency to nanoseconds and writes the same CSV column schema, so the C++ Interceptor treats SentinelARC probes identically to engine trades.
+- **`governor/targets.json`** is the only file you edit to add a new monitored service — no code changes.
+- The `source` field in the Brain's `/ingest` payload selects the correct K8s target from the registry.
 

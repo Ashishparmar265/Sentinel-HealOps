@@ -23,13 +23,14 @@ FAULT_REGISTRY = {
     3: {"type": "MEMORY_LEAK",  "action": "RESTART"}
 }
 
-# Deployment targets — keyed by source tag in the anomaly payload
-# Allows the Brain to route remediations to the right K8s deployment
-TARGET_REGISTRY = {
-    "engine":       "healops-engine",
-    "sentinelarc":  "sentinelarc-mcp",   # SentinelARC MCP microserver
-    "default":      "healops-engine",
-}
+# Deployment targets loaded from governor/targets.json
+# To monitor a new service, add it to that file — no code changes needed.
+_TARGETS_FILE = "governor/targets.json"
+if os.path.exists(_TARGETS_FILE):
+    with open(_TARGETS_FILE) as _f:
+        TARGET_REGISTRY = {k: v for k, v in json.load(_f).items() if not k.startswith("_")}
+else:
+    TARGET_REGISTRY = {"default": "healops-engine"}
 
 # Load the trained model
 MODEL_PATH = "brain/models/classifier.pkl"

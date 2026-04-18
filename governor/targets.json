@@ -1,0 +1,5 @@
+{
+  "_comment": "Map service names to their Kubernetes deployment targets. Add any service here.",
+  "engine":    "healops-engine",
+  "default":   "healops-engine"
+}
