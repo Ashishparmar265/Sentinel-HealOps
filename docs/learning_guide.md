@@ -132,7 +132,7 @@ The engine writes to a file, and the interceptor reads from it like `tail -f`.
 
 ---
 
-## 3. Communication Logic (The "Ifs" and "Buts")
+## 6. Communication Logic (The "Ifs" and "Buts")
 
 ### **Why use raw sockets for HTTP?**
 In `interceptor/src/main.cpp`, we use `socket()`, `connect()`, and `send()`.
@@ -142,4 +142,31 @@ In `interceptor/src/main.cpp`, we use `socket()`, `connect()`, and `send()`.
 
 ---
 
-*This guide will be expanded line-by-line for Phase 2 (Python ML code).*
+## 7. SentinelARC Integration (V2 Extension)
+
+Sentinel-HealOps can monitor **any** latency-emitting system, not just the C++ engine.
+The `scripts/sentinelarc_adapter.py` bridges the [SentinelARC](https://github.com/Ashishparmar265/SentinelARC) multi-agent system into the same pipeline.
+
+### Data Flow
+```
+SentinelARC FastAPI MCP Servers (port 8001)
+         │  HTTP probe (every 500ms)
+         ▼
+  sentinelarc_adapter.py
+         │  writes → /tmp/healops_sentinel_arc.csv
+         ▼
+  Interceptor (io_uring tail)
+         │  Z-score anomaly detection
+         ▼
+  Brain → TARGET_REGISTRY["sentinelarc"] → "sentinelarc-mcp"
+         │  webhook
+         ▼
+  Governor → kubectl rollout restart deployment/sentinelarc-mcp
+```
+
+### Key Design Decisions
+
+- **`source` field in Anomaly**: The Brain's `/ingest` endpoint now accepts a `source` string (`"engine"` or `"sentinelarc"`). This lets the `TARGET_REGISTRY` map each source to the correct Kubernetes deployment name.
+- **Non-invasive**: The adapter is a standalone script. No changes needed inside the SentinelARC codebase.
+- **Same Z-score math**: The adapter converts HTTP probe latency to nanoseconds and writes the same CSV column schema, so the C++ Interceptor treats SentinelARC probes identically to engine trades.
+

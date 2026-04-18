@@ -23,6 +23,14 @@ FAULT_REGISTRY = {
     3: {"type": "MEMORY_LEAK",  "action": "RESTART"}
 }
 
+# Deployment targets — keyed by source tag in the anomaly payload
+# Allows the Brain to route remediations to the right K8s deployment
+TARGET_REGISTRY = {
+    "engine":       "healops-engine",
+    "sentinelarc":  "sentinelarc-mcp",   # SentinelARC MCP microserver
+    "default":      "healops-engine",
+}
+
 # Load the trained model
 MODEL_PATH = "brain/models/classifier.pkl"
 clf = None
@@ -41,13 +49,13 @@ class Anomaly(BaseModel):
     latency_ms: float
     z_score: float
     fault_type: str
+    source: str = "default"   # "engine" | "sentinelarc" | "default"
 
 @app.post("/ingest")
 async def ingest_anomaly(anomaly: Anomaly):
-    logger.warning(f"Ingesting Anomaly Trace: Z={anomaly.z_score:.2f} | Latency={anomaly.latency_ms:.1f}ms")
+    logger.warning(f"Ingesting Anomaly Trace: Z={anomaly.z_score:.2f} | Latency={anomaly.latency_ms:.1f}ms | Source={anomaly.source}")
     
     if clf:
-        # Prepare feature vector for the model: [latency_ms, z_score]
         X = np.array([[anomaly.latency_ms, anomaly.z_score]])
         label = int(clf.predict(X)[0])
         info = FAULT_REGISTRY.get(label, {"type": "UNKNOWN", "action": "NOOP"})
@@ -58,11 +66,13 @@ async def ingest_anomaly(anomaly: Anomaly):
         else:
             info = FAULT_REGISTRY[1] # CPU_SPIKE -> RESTART
             
-    logger.info(f"Classification Result: {info['type']} -> Action: {info['action']}")
+    # Resolve which K8s deployment to remediate based on anomaly source
+    target = TARGET_REGISTRY.get(anomaly.source, TARGET_REGISTRY["default"])
+    logger.info(f"Classification Result: {info['type']} -> Action: {info['action']} -> Target: {target}")
     
     if info["action"] != "NOOP":
         try:
-            req_data = json.dumps({"action": info["action"], "target": "healops-engine"}).encode("utf-8")
+            req_data = json.dumps({"action": info["action"], "target": target}).encode("utf-8")
             req = urllib.request.Request("http://127.0.0.1:8080/webhook", data=req_data, headers={'Content-Type': 'application/json'})
             with urllib.request.urlopen(req) as response:
                 logger.info(f"Triggered Governor Response: {response.read().decode('utf-8')}")
@@ -71,6 +81,8 @@ async def ingest_anomaly(anomaly: Anomaly):
             
     return {
         "status": "processed",
+        "source": anomaly.source,
+        "target": target,
         "trade_ids": [anomaly.buy_id, anomaly.sell_id],
         "classification": info["type"],
         "remediation_action": info["action"]

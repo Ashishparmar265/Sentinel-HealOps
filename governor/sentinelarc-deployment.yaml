@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinelarc-mcp
+  labels:
+    app: sentinelarc-mcp
+    managed-by: sentinel-healops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentinelarc-mcp
+  template:
+    metadata:
+      labels:
+        app: sentinelarc-mcp
+    spec:
+      containers:
+      - name: mcp-server
+        image: ashishparmar265/sentinelarc:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "131Mi"       # matches SentinelARC's documented per-process cap
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 15
