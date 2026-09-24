@@ -1,6 +1,5 @@
 # Sentinel-HealOps 🛡️
 
-> **The 60-Second Recruiter Pitch**  
 > Sentinel-HealOps is a production-grade, self-healing **Autonomous SRE (Site Reliability Engineering) Agent**. It monitors the **SentinelARC multi-agent framework** in real-time, leverages deep statistical analysis to detect anomalies under 30ms, and uses a Machine Learning Control Plane to execute automated Kubernetes rollbacks *without human intervention*.
 
 [![Build Status](https://img.shields.io/badge/status-active-success)](https://github.com/Ashishparmar265/Sentinel-HealOps)
@@ -20,7 +19,7 @@ Modern multi-agent systems and asynchronous AI workflows cannot afford downtime.
 ---
 
 ## 🎥 Live Demo / Walkthrough
-*(Placeholder: [Watch the 2-minute architectural explanation and live system rollback here](https://youtube.com/placeholder))*
+*(Placeholder: [Watch the 2-minute architectural explanation and live system rollback here]())*
 
 ---
 
@@ -71,12 +70,6 @@ python3 scripts/sentinelarc_sentinelarc_load_generator.py --rate 200 --duration 
 
 ## 🛠️ Tech Stack & Implementation Phases
 
-| Phase | Timeline | Goal | Status |
-|---|---|---|---|
-| **Phase 1: Telemetry** | Week 1–2 | C++ ingestor + `io_uring` log harvester + Z-score tracking | ✅ Done |
-| **Phase 2: Control Plane** | Week 3 | Python/FastAPI ML Brain + Random Forest classifier | ✅ Done |
-| **Phase 3: Automation** | Week 4–5 | Governor webhook for automated `kubectl` cluster rollbacks | ✅ Done |
-| **Phase 4: Dashboard** | Week 6 | High-performance Streamlit visual health dashboard | ✅ Done |
 
 - **C++20 & Boost.Asio:** High-frequency, lock-free components.
 - **Python 3.11:** FastAPI asynchronous microservices.
@@ -87,15 +80,12 @@ python3 scripts/sentinelarc_sentinelarc_load_generator.py --rate 200 --duration 
 
 ## 📁 Repository Structure
 
-Unlike typical student projects, Sentinel-HealOps is structured as a recruiter-ready, production-grade microservice architecture. 
-**Every line of logic is heavily documented for technical review:**
-
 - 🧠 `brain/`: The ML predictive classification model. ([Read Walkthrough](docs/brain_walkthrough.md))
 - 📡 `interceptor/`: The side-car ingestion telemetry engine. ([Read Walkthrough](docs/interceptor_main_walkthrough.md))
 - 🛠️ `governor/`: The Kubernetes native healing wrapper. ([Read Walkthrough](docs/governor_walkthrough.md))
 - 📚 `docs/`: In-depth, mathematical explanations of the algorithms used. ([Learning Guide](docs/learning_guide.md))
 
-*(Note: Legacy PDFs and text documents have been archived cleanly into `docs/reference_assets/` to ensure a focused, professional workspace).*
+
 
 ---
 **Author**: Ashish Parmar | IIIT Lucknow | M.Tech AI & ML
