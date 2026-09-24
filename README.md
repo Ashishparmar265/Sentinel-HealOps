@@ -80,10 +80,10 @@ python3 scripts/sentinelarc_sentinelarc_load_generator.py --rate 200 --duration 
 
 ## 📁 Repository Structure
 
-- 🧠 `brain/`: The ML predictive classification model. ([Read Walkthrough](docs/brain_walkthrough.md))
-- 📡 `interceptor/`: The side-car ingestion telemetry engine. ([Read Walkthrough](docs/interceptor_main_walkthrough.md))
-- 🛠️ `governor/`: The Kubernetes native healing wrapper. ([Read Walkthrough](docs/governor_walkthrough.md))
-- 📚 `docs/`: In-depth, mathematical explanations of the algorithms used. ([Learning Guide](docs/learning_guide.md))
+- 🧠 `brain/`: The ML predictive classification model. 
+- 📡 `interceptor/`: The side-car ingestion telemetry engine. 
+- 🛠️ `governor/`: The Kubernetes native healing wrapper. 
+- 📚 `docs/`: In-depth, mathematical explanations of the algorithms used.
 
 
 
