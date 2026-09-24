@@ -14,13 +14,11 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="HealOps Brain", description="Autonomous Anomaly Classification Engine")
 
-# Mapping of model labels to fault types and remediation actions
-# 0: HEALTHY, 1: CPU_SPIKE, 2: NETWORK_DELAY, 3: MEMORY_LEAK
 FAULT_REGISTRY = {
-    0: {"type": "HEALTHY",      "action": "NOOP"},
-    1: {"type": "CPU_SPIKE",    "action": "RESTART"},
-    2: {"type": "NETWORK_DELAY","action": "ROLLBACK"},
-    3: {"type": "MEMORY_LEAK",  "action": "RESTART"}
+    0: {"type": "HEALTHY",             "action": "NOOP"},
+    1: {"type": "CRIU_STALL",          "action": "RESTART"},
+    2: {"type": "RMQ_BACKPRESSURE",    "action": "ROLLBACK"},
+    3: {"type": "FASTAPI_TIMEOUT",     "action": "RESTART"}
 }
 
 # Deployment targets loaded from governor/targets.json
@@ -50,7 +48,7 @@ class Anomaly(BaseModel):
     latency_ms: float
     z_score: float
     fault_type: str
-    source: str = "default"   # "engine" | "sentinelarc" | "default"
+    source: str = "sentinelarc"
 
 @app.post("/ingest")
 async def ingest_anomaly(anomaly: Anomaly):
@@ -61,11 +59,11 @@ async def ingest_anomaly(anomaly: Anomaly):
         label = int(clf.predict(X)[0])
         info = FAULT_REGISTRY.get(label, {"type": "UNKNOWN", "action": "NOOP"})
     else:
-        # Fallback heuristic
+        # Fallback heuristic for SentinelARC
         if anomaly.latency_ms > 50.0:
-            info = FAULT_REGISTRY[2] # NETWORK_DELAY -> ROLLBACK
+            info = FAULT_REGISTRY[2] # RMQ_BACKPRESSURE -> ROLLBACK
         else:
-            info = FAULT_REGISTRY[1] # CPU_SPIKE -> RESTART
+            info = FAULT_REGISTRY[1] # CRIU_STALL -> RESTART
             
     # Resolve which K8s deployment to remediate based on anomaly source
     target = TARGET_REGISTRY.get(anomaly.source, TARGET_REGISTRY["default"])

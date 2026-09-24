@@ -4,10 +4,10 @@ This document is for developers who want to understand exactly how every line of
 
 ---
 
-## 1. Engine Component (`engine/`)
+## 1. Engine Component (``)
 
-### 1.1 `engine/include/Order.h`
-This header defines the data models for orders and trades.
+
+This header defines the data models for orders and events.
 
 ```cpp
 enum class Side : uint8_t { BUY, SELL };
@@ -24,11 +24,11 @@ struct Order {
     OrderType   type;
     int64_t     timestamp_ns; 
 ```
-- **`timestamp_ns`**: We use nanoseconds to measure the difference between order arrival and matching. In high-frequency trading, even 1 millisecond (1,000,000 ns) is considered slow.
+- **`timestamp_ns`**: We use nanoseconds to measure the difference between order arrival and matching. In high-frequency multi-agent, even 1 millisecond (1,000,000 ns) is considered slow.
 
 ---
 
-### 1.2 `engine/src/OrderBook.cpp` (The Matching Engine)
+
 This is the most critical file in the project.
 
 #### **The Price-Time Priority Logic**
@@ -51,7 +51,7 @@ while (order.qty > 0 && !asks_.empty()) {
 
 ---
 
-### 1.3 `engine/src/Logger.cpp`
+### 1.3 `src/Logger.cpp`
 This records every matching event.
 
 ```cpp
@@ -66,14 +66,14 @@ void TradeLogger::log(const Trade& t) {
 
 ## 2. Project Directory & File Breakdown
 
-### **`engine/`** (The Trading Core)
+### **``** (The Trading Core)
 This directory contains the high-performance C++ matching engine.
-- **`include/Order.h`**: The "Atom" of the system. Defines what an `Order` and a `Trade` look like. 
+
     - *If/But*: Uses `int64_t` for nanosecond timestamps to avoid overflow for the next ~290 years.
 - **`include/OrderBook.h`**: The "Blueprint". Defines the `PriceLevel` (as a `std::deque`) and the `OrderBook` class.
-- **`src/OrderBook.cpp`**: The "Brain". This contains the matching loop. 
+
     - [**DEEP DIVE: Line-by-Line Match Engine Walkthrough**](file:///home/iiitl/Documents/Sentinel-HealOps/docs/orderbook_walkthrough.md)
-- **`src/Logger.cpp`**: The "Recorder". Writes every trade to a CSV file.
+- **`src/Logger.cpp`**: The "Recorder". Writes every event to a CSV file.
 
 ### **`brain/`** (The AI Control Plane)
 A high-performance Python service that classifies anomalies.
@@ -87,7 +87,7 @@ Reacts to the Brain's decisions by executing infrastructure changes.
 - **`engine-deployment.yaml`**: The Kubernetes Deployment manifest for the matching engine used during rollouts.
 
 ### **`scripts/`** (Testing & Automation)
-- **`load_generator.py`**: Simulates thousands of orders per second and injects "faults" (artificial delay) so we can see the system heal.
+- **`sentinelarc_load_generator.py`**: Simulates thousands of orders per second and injects "faults" (artificial delay) so we can see the system heal.
 - **`test_remediation_layer.sh`**: The end-to-end Python/Mock verification shell script.
 
 ---
@@ -96,10 +96,10 @@ Reacts to the Brain's decisions by executing infrastructure changes.
 
 Because this project uses advanced C++ (C++20) and real-time statistics, we've created dedicated deep-dive documents:
 
-1. **[Core Matching Logic (engine/src/OrderBook.cpp)](file:///home/iiitl/Documents/Sentinel-HealOps/docs/orderbook_walkthrough.md)**
+
    - Explains how Bid/Ask maps work.
    - Breakdown of the Price-Time priority loop.
-   - Memory management and performance trade-offs.
+   - Memory management and performance event-offs.
 
 2. **[Anomaly Detection Math (interceptor/src/ZScoreDetector.cpp)](file:///home/iiitl/Documents/Sentinel-HealOps/docs/detector_walkthrough.md)**
    - Explains Welford's Algorithm for online mean/variance.
@@ -116,7 +116,7 @@ Because this project uses advanced C++ (C++20) and real-time statistics, we've c
 
 ## 4. Operational Workflow
 
-1. **Trade Match**: `OrderBook.cpp` finds a price-time match.
+
 2. **Log Entry**: `Logger.cpp` writes `latency_ns` to a file.
 3. **Observation**: `interceptor/main.cpp` reads the new line.
 4. **Analysis**: `ZScoreDetector.cpp` flags the latency as "normal" or "outlier".

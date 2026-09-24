@@ -6,7 +6,7 @@ import os
 
 # 1. Generate Synthetic Training Data
 # Features: [latency_ms, z_score, order_count_per_sec]
-# Target: [0 (HEALTHY), 1 (CPU_SPIKE), 2 (NETWORK_DELAY), 3 (MEMORY_LEAK)]
+# Target: [0 (HEALTHY), 1 (CRIU_STALL), 2 (RMQ_BACKPRESSURE), 3 (FASTAPI_TIMEOUT)]
 
 def generate_training_data(n_samples=5000):
     data = []
@@ -17,15 +17,15 @@ def generate_training_data(n_samples=5000):
         z = (lat - 0.5) / 0.1
         data.append([lat, z, 0]) # 0 = HEALTHY
         
-        # CPU Spike (high latency, low Z variance)
+        # CRIU Stall (high latency, low Z variance)
         lat = np.random.normal(15.0, 2.0)
         z = (lat - 0.5) / 0.1 
-        data.append([lat, z, 1]) # 1 = CPU_SPIKE
+        data.append([lat, z, 1]) # 1 = CRIU_STALL
         
-        # Network Delay (extremely high spikes, high Z)
+        # RMQ Backpressure (extremely high spikes, high Z)
         lat = np.random.normal(80.0, 10.0)
         z = (lat - 0.5) / 0.1
-        data.append([lat, z, 2]) # 2 = NETWORK_DELAY
+        data.append([lat, z, 2]) # 2 = RMQ_BACKPRESSURE
         
     df = pd.DataFrame(data, columns=['latency_ms', 'z_score', 'label'])
     return df

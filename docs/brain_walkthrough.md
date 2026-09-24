@@ -14,7 +14,7 @@ def generate_training_data(n_samples=5000):
     lat = np.random.normal(15.0, 2.0) # [1]
     z = (lat - 0.5) / 0.1 # [2]
 ```
-- **[1] `np.random.normal`**: We use a Normal Distribution (Gaussian) to simulate realistic latencies. For a CPU spike, we assume an average of 15ms.
+- **[1] `np.random.normal`**: We use a Normal Distribution (Gaussian) to simulate realistic latencies. For a CRIU stall, we assume an average of 15ms.
 - **[2] `z = (lat - 0.5) / 0.1`**: We calculate the Z-score exactly as the C++ sidecar does. This ensures the training data matches the real-world input.
 
 ```python
@@ -31,7 +31,7 @@ This file is the decision engine that receives data from C++.
 
 ```python
 FAULT_REGISTRY = {
-    1: {"type": "CPU_SPIKE", "action": "RESTART"}, # [4]
+    1: {"type": "CRIU_STALL", "action": "RESTART"}, # [4]
 ```
 - **[4] Registry**: We map model labels (0, 1, 2) to human-readable types and specific "Remediation Actions". This decouples the AI prediction from the actual infrastructure logic.
 
@@ -55,7 +55,7 @@ label = int(clf.predict(X)[0]) # [7]
 - **"If" the model isn't trained yet?**
     - The code includes a check: `if os.path.exists(MODEL_PATH)`. If the file is missing, it falls back to a simple `if latency > 50` heuristic.
 - **"But" what about data drift?**
-    - If the trading engine's baseline latency changes (e.g., after an upgrade), the old model might start flagging everything as an anomaly.
+    - If the SentinelARC's baseline latency changes (e.g., after an upgrade), the old model might start flagging everything as an anomaly.
     - **Future Scope**: Implementation of a "Re-training Pipeline" that periodically updates the model with the latest stable traffic.
 - **"Why" use FastAPI?**
     - FastAPI uses `uvicorn` and `asyncio`, making it much faster than older frameworks like Flask. It can handle hundreds of anomaly events per second without breaking a sweat.

@@ -1,6 +1,6 @@
 PROJECT DESIGN DOCUMENT
 Project Title: HealOps: Autonomous SRE and Self-Healing Infrastructure for a High-Frequency
-C++ Order Matching Engine
+C++ Order SentinelARC
 Author: Ashish Parmar
 Institution: Indian Institute of Information Technology, Lucknow (IIITL)
 Department: Computer Science & Engineering (M.Tech)
@@ -8,7 +8,7 @@ Specialization: Artificial Intelligence & Machine Learning
 Date: March 2026
 
 1. Abstract
-In ultra-low latency environments such as financial trading exchanges, system reliability is as
+In ultra-low latency environments such as financial multi-agent exchanges, system reliability is as
 critical as execution speed. Traditional observability platforms rely on human-in-the-loop
 debugging, which is insufficient when a degradation of even 50 milliseconds constitutes a
 catastrophic failure. This project proposes a fully autonomous Site Reliability Engineering (SRE)
@@ -21,7 +21,7 @@ demonstrates true zero-touch remediation in high-throughput data processing syst
 
 2. Introduction
 2.1 Background
-Financial technology relies on Order Matching Engines to pair buy and sell requests at millions
+Financial technology relies on Order SentinelARCs to pair buy and sell requests at millions
 of transactions per second. These systems are highly optimized, utilizing advanced C++
 memory management and parallel processing. However, when deployed in containerized cloud
 environments, they become susceptible to network latency spikes, "noisy neighbor" resource
@@ -30,13 +30,13 @@ exhaustion, and complex microservice cascading failures.
 When a network switch degrades or an incoming data stream causes serialization errors, an
 order engine may not crash immediately; instead, it experiences latency bloat. Standard
 CPU/RAM dashboards often fail to trigger alerts for these micro-anomalies. Consequently,
-trades are executed out of optimal windows before engineers can manually identify the
+events are executed out of optimal windows before engineers can manually identify the
 
 bottleneck and reroute traffic.
 2.3 Objectives
 The primary objectives of this project are:
 1.​ Engine Development: To engineer a Level 3 (L3) order matching engine in C++ capable of
-sub-millisecond trade execution.
+sub-millisecond event execution.
 2.​ Telemetry Interception: To implement a zero-overhead log and metric ingestion sidecar
 that does not impact the critical path of the matching engine.
 3.​ Algorithmic Triage: To deploy an AI-driven control plane that calculates statistical
@@ -65,11 +65,11 @@ trace to an LLM to extract the root cause and determine the safest remediation s
 
 4. System Architecture
 The architecture is divided into the Target Application and the HealOps Immune System:
-4.1 The Target: C++ Matching Engine
+4.1 The Target: C++ SentinelARC
 ●​ Language: C++20.
 ●​ Role: Processes simulated FIX (Financial Information eXchange) protocol messages.
 
-●​ Logic: Maintains the order book and logs execution times for every matched trade.
+●​ Logic: Maintains the order book and logs execution times for every matched event.
 4.2 The Interceptor: High-Speed Ingestor
 ●​ Language: C++ / Linux socket programming.
 ●​ Role: Acts as a DaemonSet to harvest logs.
@@ -101,7 +101,7 @@ Infrastructure: Docker, Docker Compose, GitHub Actions.
 5.2 Phase 1: Engine and baseline metrics
 ●​ Goal: Build a functional order book and establish baseline latency ($<1$ms).
 ●​ Method: Implement the matching logic and write a load-generator script to simulate
-10,000 trades per second.
+10,000 events per second.
 5.3 Phase 2: HealOps Integration
 ●​ Goal: Attach the SRE sidecar and train the Level 1 ML classifier.
 ●​ Method: Set up the Python backend to receive telemetry. Train the Random Forest model
@@ -123,7 +123,7 @@ Mitigation Strategy
 Observer Effect Latency
 
 The monitoring tool slows
-down the trading engine,
+down the SentinelARC,
 defeating the purpose.
 
 Use memory-mapped files
@@ -136,7 +136,7 @@ False Positive Failovers
 
 Triggering a node restart
 during a normal traffic spike
-disrupts trading.
+disrupts multi-agent.
 
 Implement a strict confidence
 threshold for the AI model and
@@ -169,7 +169,7 @@ Future iterations will explore migrating the log interception layer from user-sp
 kernel-space using eBPF (Extended Berkeley Packet Filter). Furthermore, the Order Matching
 
 Engine can be scaled into a distributed system utilizing the Raft consensus algorithm, allowing
-HealOps to manage an entire cluster of trading nodes.
+HealOps to manage an entire cluster of multi-agent nodes.
 
 9. Conclusion
 This project demonstrates the critical intersection of high-performance computing and

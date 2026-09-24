@@ -27,7 +27,7 @@ void ZScoreDetector::updateStats(double val, bool add) {
 ---
 
 ## 2. `ZScoreDetector::feed`
-This function is called for every trade logged by the engine.
+This function is called for every event logged by the engine.
 
 ```cpp
 if (samples_.size() > window_) { // [6]
@@ -36,13 +36,13 @@ if (samples_.size() > window_) { // [6]
     updateStats(oldest, false); // [7]
 }
 ```
-- **[6] Rolling Window**: We only care about recent data (e.g., the last 1000 trades).
-- **[7] `updateStats(..., false)`**: This **removes** the effect of the oldest trade from our mean and variance calculations. This makes the detector "forget" the past and adapt to the present.
+- **[6] Rolling Window**: We only care about recent data (e.g., the last 1000 events).
+- **[7] `updateStats(..., false)`**: This **removes** the effect of the oldest event from our mean and variance calculations. This makes the detector "forget" the past and adapt to the present.
 
 ```cpp
 if (samples_.size() < 30) return false; // [8]
 ```
-- **[8] Warm-up**: Statistics are unreliable with very few samples (e.g., 2 or 3 trades). We wait for 30 trades to get a "stable" baseline before we start flagging anomalies.
+- **[8] Warm-up**: Statistics are unreliable with very few samples (e.g., 2 or 3 events). We wait for 30 events to get a "stable" baseline before we start flagging anomalies.
 
 ```cpp
 double z = (latency_ns - mean_) / sigma; // [9]
@@ -59,10 +59,10 @@ double z = (latency_ns - mean_) / sigma; // [9]
 - **"But" what if latency is 0?**
     - If `sigma` (Standard Deviation) is 0 (all latencies are identical), the code hits line 24: `if (sigma < 1e-9) return false;`. This prevents "Division by Zero" crashes.
 - **"If" the system gets faster?**
-    - If the engine gets faster, the `mean_` will decrease over time. A Z-score can be **negative** (meaning the trade was faster than average). Our code uses `std::abs(z)` to detect both extreme slowness AND extreme speed (which can also indicate a bug).
+    - If the engine gets faster, the `mean_` will decrease over time. A Z-score can be **negative** (meaning the event was faster than average). Our code uses `std::abs(z)` to detect both extreme slowness AND extreme speed (which can also indicate a bug).
 - **"Why" Welford's over simple loops?**
-    - A simple loop `for(val : samples) { sum += val; }` is $O(N)$ every time a trade happens. 
-    - Welford's is $O(1)$. It's much faster and can handle millions of trades without LAG.
+    - A simple loop `for(val : samples) { sum += val; }` is $O(N)$ every time a event happens. 
+    - Welford's is $O(1)$. It's much faster and can handle millions of events without LAG.
 
 ---
 

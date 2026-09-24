@@ -27,8 +27,8 @@ async def trigger_action(req: ActionRequest):
     elif req.action == "ROLLBACK":
         cmd = ["kubectl", "rollout", "undo", f"deployment/{req.target}"] # [2]
 ```
-- **[1] Restart**: This triggers a rolling restart in Kubernetes. If we observed an anomalous `CPU_SPIKE`, we restart the containers sequentially, ensuring no downtime, but fully wiping the memory slate.
-- **[2] Rollback (Undo)**: If the anomaly was defined as `NETWORK_DELAY` immediately after a deployment upgrade, it's safer to undo the deployment back to the last stable replica-set explicitly.
+- **[1] Restart**: This triggers a rolling restart in Kubernetes. If we observed an anomalous `CRIU_STALL`, we restart the containers sequentially, ensuring no downtime, but fully wiping the memory slate.
+- **[2] Rollback (Undo)**: If the anomaly was defined as `RMQ_BACKPRESSURE` immediately after a deployment upgrade, it's safer to undo the deployment back to the last stable replica-set explicitly.
 
 ---
 

@@ -1,6 +1,6 @@
 # Exhaustive Walkthrough: `interceptor/src/main.cpp`
 
-This document explains the I/O operations and operational flow of the C++ Interceptor. The Interceptor sits between the Matching Engine and the Python Control Plane, acting as an anomaly-detector sidecar.
+This document explains the I/O operations and operational flow of the C++ Interceptor. The Interceptor sits between the SentinelARC and the Python Control Plane, acting as an anomaly-detector sidecar.
 
 ---
 
@@ -35,7 +35,7 @@ static bool httpPost(const std::string& host, int port,
 
 ## 2. Kernel File Tailing (`io_uring`)
 
-The Interceptor utilizes Linux's Native `io_uring` to perform zero-copy file monitoring on the CSV trade traces, circumventing `std::ifstream` blocking overhead.
+The Interceptor utilizes Linux's Native `io_uring` to perform zero-copy file monitoring on the CSV event traces, circumventing `std::ifstream` blocking overhead.
 
 ```cpp
     struct io_uring ring;

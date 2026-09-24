@@ -59,9 +59,10 @@ static bool httpPost(const std::string& host, int port,
 int main(int argc, char* argv[]) {
     signal(SIGINT, handle_sigint);
 
-    const std::string log_path   = (argc > 1) ? argv[1] : "/tmp/healops_trades.csv";
+    const std::string log_path   = (argc > 1) ? argv[1] : "/tmp/sentinelarc_events.csv";
     const std::string brain_host = (argc > 2) ? argv[2] : "127.0.0.1";
     const int         brain_port = (argc > 3) ? std::stoi(argv[3]) : 8000;
+    const std::string source     = (argc > 4) ? argv[4] : "sentinelarc";
     const double      z_thresh   = 3.0;
     const size_t      window     = 1000;
 
@@ -78,7 +79,8 @@ int main(int argc, char* argv[]) {
              << "\"sell_id\":"       << evt.sell_order_id << ","
              << "\"latency_ms\":"    << evt.latency_ms    << ","
              << "\"z_score\":"       << evt.z_score       << ","
-             << "\"fault_type\":\""  << evt.fault_type    << "\""
+             << "\"fault_type\":\""  << evt.fault_type    << "\","
+             << "\"source\":\""      << source            << "\""
              << "}";
 
         bool ok = httpPost(brain_host, brain_port, "/ingest", json.str());
@@ -91,6 +93,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "[Interceptor] Tailing: " << log_path << '\n';
     std::cout << "[Interceptor] Brain endpoint: " << brain_host << ':' << brain_port << '\n';
+    std::cout << "[Interceptor] Source label: " << source << '\n';
     std::cout << "[Interceptor] Z-threshold: " << z_thresh
               << "  Window: " << window << '\n';
 

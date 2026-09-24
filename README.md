@@ -1,7 +1,7 @@
 # Sentinel-HealOps 🛡️
 
 > **The 60-Second Recruiter Pitch**  
-> Sentinel-HealOps is a production-grade, self-healing **Autonomous SRE (Site Reliability Engineering) Agent**. It monitors a high-frequency C++ Order Matching Engine in real-time, leverages deep statistical analysis to detect anomalies under 30ms, and uses a Machine Learning Control Plane to execute automated Kubernetes rollbacks *without human intervention*.
+> Sentinel-HealOps is a production-grade, self-healing **Autonomous SRE (Site Reliability Engineering) Agent**. It monitors the **SentinelARC multi-agent framework** in real-time, leverages deep statistical analysis to detect anomalies under 30ms, and uses a Machine Learning Control Plane to execute automated Kubernetes rollbacks *without human intervention*.
 
 [![Build Status](https://img.shields.io/badge/status-active-success)](https://github.com/Ashishparmar265/Sentinel-HealOps)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/licenses/MIT)
@@ -9,7 +9,7 @@
 ---
 
 ## 🎯 Why This Project Matters
-Modern algorithmic trading systems and critical infrastructures cannot afford downtime. Traditional monitoring pages on-call engineers, taking several minutes to resolve issues. **Sentinel-HealOps shrinks Mean Time To Recovery (MTTR) from minutes to sub-60 seconds** by mathematically detecting faults (like CPU spikes or network saturation) before they crash the system, and autonomously executing Kubernetes rollbacks.
+Modern multi-agent systems and asynchronous AI workflows cannot afford downtime. Traditional monitoring pages on-call engineers, taking several minutes to resolve issues. **Sentinel-HealOps shrinks Mean Time To Recovery (MTTR) from minutes to sub-60 seconds** by mathematically detecting faults (like CRIU resume stalls or RabbitMQ backpressure) before they crash the system, and autonomously executing Kubernetes rollbacks.
 
 ## 🚀 Performance Metrics & Results
 - **Log Ingestion:** `20,000–40,000 logs/sec` via `io_uring` kernel space (Zero-Copy).
@@ -29,7 +29,7 @@ Modern algorithmic trading systems and critical infrastructures cannot afford do
 ```mermaid
 flowchart LR
     subgraph K8s_Cluster["Kubernetes Cluster"]
-        ME["C++ Matching Engine\n(FIX Protocol)"] -- Disk I/O --> CSV["Latency Trace Logs"]
+        ME["SentinelARC\n(Agents/RabbitMQ)"] -- Disk I/O --> CSV["Latency Trace Logs"]
         CSV -- io_uring --> INC["C++ Interceptor\n(Z-Score Stats)"]
     end
     
@@ -61,8 +61,8 @@ cd Sentinel-HealOps
 python3 governor/action-webhook.py &
 python3 brain/main.py &
 
-# 3. Inject synthetic high-frequency traffic and server anomalies
-python3 scripts/load_generator.py --rate 10000 --duration 30
+# 3. Inject synthetic SentinelARC traffic and server anomalies
+python3 scripts/sentinelarc_sentinelarc_load_generator.py --rate 200 --duration 30
 
 # 4. Watch the AI classify faults and automatically trigger Kubernetes rollbacks in your terminal!
 ```
@@ -91,7 +91,6 @@ Unlike typical student projects, Sentinel-HealOps is structured as a recruiter-r
 **Every line of logic is heavily documented for technical review:**
 
 - 🧠 `brain/`: The ML predictive classification model. ([Read Walkthrough](docs/brain_walkthrough.md))
-- ⚡ `engine/`: The C++ Order Matching implementation. ([Read Walkthrough](docs/orderbook_walkthrough.md))
 - 📡 `interceptor/`: The side-car ingestion telemetry engine. ([Read Walkthrough](docs/interceptor_main_walkthrough.md))
 - 🛠️ `governor/`: The Kubernetes native healing wrapper. ([Read Walkthrough](docs/governor_walkthrough.md))
 - 📚 `docs/`: In-depth, mathematical explanations of the algorithms used. ([Learning Guide](docs/learning_guide.md))

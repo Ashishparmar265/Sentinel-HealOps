@@ -6,10 +6,10 @@ This document provides a comprehensive, deep-dive analysis into the technology s
 
 ## 1. Core Engine & Interceptor
 **Chosen Technology:** C++20
-**Component:** `engine/` (Order Matching Engine) and `interceptor/` (Telemetry Sidecar)
+**Component:** `` (Order SentinelARC) and `interceptor/` (Telemetry Sidecar)
 
 ### Why We Chose It
-In high-frequency trading and ultra-low latency monitoring, time is measured in nanoseconds. C++20 provides deterministic memory management, zero-cost abstractions, and direct hardware access. 
+In high-frequency multi-agent and ultra-low latency monitoring, time is measured in nanoseconds. C++20 provides deterministic memory management, zero-cost abstractions, and direct hardware access. 
 - **Deterministic Latency:** We manually manage memory (RAII), meaning there are no Garbage Collection (GC) pauses that could suddenly freeze the engine for milliseconds.
 - **Lock-Free Potential:** C++ allows for atomic operations and lock-free data structures essential for processing 40,000+ orders per second.
 - **OS-Level Access:** The sidecar relies heavily on `io_uring` (Linux's asynchronous I/O interface). C++ provides seamless, zero-overhead access to these kernel APIs.
@@ -29,7 +29,7 @@ In high-frequency trading and ultra-low latency monitoring, time is measured in 
 **Component:** `brain/` (ML Classifier) and `governor/` (Webhook Action Runner)
 
 ### Why We Chose It
-While the Engine requires nanosecond precision, the Control Plane operates "out-of-band." It doesn't block the main trading loop. Python is the undisputed king of data science and Machine Learning.
+While the Engine requires nanosecond precision, the Control Plane operates "out-of-band." It doesn't block the main multi-agent loop. Python is the undisputed king of data science and Machine Learning.
 - **Ecosystem:** Python gives us native, instant access to Pandas, Scikit-Learn, and NumPy.
 - **FastAPI (ASGI):** FastAPI uses modern Python `async/await`. Even though Python is interpreted, FastAPI can comfortably handle thousands of concurrent HTTP POST webhook requests from the Interceptor without blocking, thanks to asynchronous I/O via `uvicorn`.
 
