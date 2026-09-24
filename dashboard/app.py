@@ -10,13 +10,13 @@ st.title("🛡️ Sentinel-HealOps Control Center")
 st.subheader("Autonomous Machine Learning SRE Agent")
 st.markdown("---")
 
-LOG_FILE = "/tmp/healops_trades.csv"
+LOG_FILE = "/tmp/sentinelarc_events.csv"
 
 def load_data(limit=500):
     if not os.path.exists(LOG_FILE):
         return pd.DataFrame()
     try:
-        # Load exactly 6 columns corresponding to C++ logs and Python load_generator
+        # Load exactly 6 columns corresponding to SentinelARC events
         df = pd.read_csv(LOG_FILE, names=['timestamp_ns', 'buy_id', 'sell_id', 'price', 'qty', 'latency_ns'], header=0)
         
         if df.empty:
@@ -24,7 +24,7 @@ def load_data(limit=500):
             
         df = df.tail(limit)
         df['latency_ms'] = df['latency_ns'] / 1e6
-        df['trade_id'] = range(len(df))
+        df['event_id'] = range(len(df))
         return df
     except Exception as e:
         st.error(f"Error parsing logs: {e}")
@@ -45,9 +45,9 @@ with placeholder.container():
         # Heuristic display mirroring the AI model thresholds
         status = "HEALTHY"
         if current_lat > 50:
-            status = "NETWORK_DELAY -> ROLLBACKING"
+            status = "RMQ_BACKPRESSURE -> ROLLBACKING"
         elif current_lat > 10:
-            status = "CPU_SPIKE -> RESTARTING"
+            status = "CRIU_STALL -> RESTARTING"
             
         col1.metric("Live Latency", f"{current_lat:.2f} ms", f"{current_lat - historical_mean:.2f} ms", delta_color="inverse")
         col2.metric("Mean Latency", f"{historical_mean:.2f} ms")
@@ -57,14 +57,14 @@ with placeholder.container():
         st.markdown("### High-Frequency Latency Telemetry")
         
         # Render a rich plotly chart
-        fig = px.line(df, x='trade_id', y='latency_ms', title='Latency Over Time', markers=True)
-        fig.add_hline(y=10.0, line_dash="dash", line_color="orange", annotation_text="CPU Spike Threshold")
-        fig.add_hline(y=50.0, line_dash="dash", line_color="red", annotation_text="Network Delay Threshold")
-        fig.update_layout(yaxis_title="Latency (ms)", xaxis_title="Recent Trade Tick", template='plotly_dark')
+        fig = px.line(df, x='event_id', y='latency_ms', title='Latency Over Time', markers=True)
+        fig.add_hline(y=10.0, line_dash="dash", line_color="orange", annotation_text="CRIU Stall Threshold")
+        fig.add_hline(y=50.0, line_dash="dash", line_color="red", annotation_text="RabbitMQ Backpressure Threshold")
+        fig.update_layout(yaxis_title="Latency (ms)", xaxis_title="Recent Event", template='plotly_dark')
         
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("⚠️ Waiting for C++ Engine telemetry stream. Run `python3 scripts/load_generator.py` to begin.")
+        st.info("⚠️ Waiting for SentinelARC telemetry stream. Run `python3 scripts/sentinelarc_load_generator.py` to begin.")
 
 # Streamlit hack loop for real-time tracking
 time.sleep(1)
